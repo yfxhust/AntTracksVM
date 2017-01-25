@@ -287,24 +287,6 @@ void EventsGCRuntime::fire_gc_end(GCType type, jint id, GCCause::Cause cause, bo
                     // to be at a safepoint to do that (due to concurrent allocations)
                     //verify_all_objects_handled_of(cmsgen->cmsSpace());
                     clear_objects_in(cmsgen->cmsSpace());
-                } else if (GCCause::_allocation_failure == cause) { // parnew end
-                    Generation* g0 = gch->get_gen(0);
-                    assert(g0->kind() == Generation::ParNew || g0->kind() == Generation::ASParNew, "Wrong generation!");
-                    ParNewGeneration* young = (ParNewGeneration*) g0;
-                    // during promotion failures eden may still contain objects
-                    assert(failed || young->eden()->is_empty(), "eden must be empty!");
-                    assert(young->to()->is_empty(), "survivor must be emtpy!");
-                    /* manually clear all affected spaces */
-                    clear_objects_in(young->eden());
-                    clear_objects_in(young->to());
-                    /* now we can verify */
-                    verify_all_objects_handled_of(young->from());
-                    
-                    if (is_gc_active()) {
-                      // clear objects during ongoing CMS collection, to not interfere
-                      // with with verification
-                      handled_objects->Clear();
-                    }
                 } else if (GCCause::_no_gc == cause) {// cms compaction end
                     assert(!is_gc_active(), "sanity check");
                     Generation* g1 = gch->get_gen(1);
@@ -318,8 +300,24 @@ void EventsGCRuntime::fire_gc_end(GCType type, jint id, GCCause::Cause cause, bo
                     synchronized(lock) {
                       assert(handled_objects->Size() == 0, "should be");
                     }
-                } else {
-                    assert(false, "WTF?");
+                } else { // parnew end
+                    Generation* g0 = gch->get_gen(0);
+                    assert(g0->kind() == Generation::ParNew || g0->kind() == Generation::ASParNew, "Wrong generation!");
+                    ParNewGeneration* young = (ParNewGeneration*) g0;
+                    // during promotion failures eden may still contain objects
+                    assert(failed || young->eden()->is_empty(), "eden must be empty!");
+                    assert(young->to()->is_empty(), "survivor must be emtpy!");
+                    /* manually clear all affected spaces */
+                    clear_objects_in(young->to());
+                    /* now we can verify */
+                    verify_all_objects_handled_of(young->eden());
+                    verify_all_objects_handled_of(young->from());
+                    
+                    if (is_gc_active()) {
+                      // clear objects during ongoing CMS collection, to not interfere
+                      // with with verification
+                      handled_objects->Clear();
+                    }
                 }
             } else {
                 assert(false, "here be dragons");

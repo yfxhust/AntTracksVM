@@ -53,6 +53,7 @@ size_t ParGCAllocBuffer::AlignmentReserve;
 
 void ParGCAllocBuffer::retire(bool end_of_gc, bool retain) {
   assert(!retain || end_of_gc, "Can only retain at GC end.");
+  if(TraceObjectsGC) retain = false;
   if (_retained) {
     // If the buffer had been retained shorten the previous filler object.
     assert(_retained_filler.end() <= _top, "INVARIANT");
